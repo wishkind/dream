@@ -9,8 +9,6 @@ import base64
 import random
 from PIL import Image
 from project.spider import Spider
-from lib.log import LogHandler
-log = LogHandler(__name__)
 
 
 class Verification:
@@ -59,12 +57,12 @@ class Verification:
         # 判断是否验证成功
         try:
             self.wait.until(EC.presence_of_element_located((By.XPATH, '//div[@class="geetest_slider geetest_success"]')))
-            log.info('验证成功')
+            print('验证成功')
         except TimeoutException:
-            log.error('再试一次')
+            print('再试一次')
             time.sleep(5)
             try:
-                self.driver.find_element_by_xpath('geetest_panel_error_content').click()
+                self.wait.until(EC.presence_of_element_located((By.XPATH, '//div[@class="geetest_panel_error_content"]'))).click()
                 time.sleep(5)
                 self.move()
             except TimeoutException:
@@ -72,8 +70,6 @@ class Verification:
 
         # 获取cookie
         self.get_cookie()
-        # 关闭浏览器
-        self.driver.close()
 
     def save_img(self, img_name, class_name):
         """
@@ -168,10 +164,12 @@ class Verification:
             name = j['name']
             value = j['value']
             str_cookie = str_cookie + name + '=' + value + ';'
-        log.info(str_cookie)
+        print(str_cookie)
+        # 关闭浏览器
+        self.driver.close()
         # 将cookie传入爬虫代码
-        s = Spider(str_cookie)
-        s.start()
+        # s = Spider(str_cookie)
+        # s.start()
 
 
 if __name__ == '__main__':
