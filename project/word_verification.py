@@ -5,11 +5,10 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
 import time
-import base64
-import random
 from io import BytesIO
 from PIL import Image
 import re
+from project.chaojiying import CHAOJiYINGClient
 
 
 class WordClick:
@@ -19,14 +18,33 @@ class WordClick:
         self.cookie = cookie
         self.driver = webdriver.Chrome()
         self.wait = WebDriverWait(self.driver, 20)
+        self.client = CHAOJiYINGClient()
 
     def start(self):
+        """
+        打开网页，传递cookie访问
+        :return:
+        """
         # 打开网页
         self.driver.get(self.url)
         # 最大化
         self.driver.maximize_window()
         # 将传进来的cookie转成多个字典传入driver中
         cookies = self.cookie.split(';')
+        self.input_cookie(cookies)
+        # 再次打开网页，获取带有验证码网页
+        self.driver.get(self.url)
+        time.sleep(2)
+        # 进行识别
+        str_cookie = self.recognize()
+        return str_cookie
+
+    def input_cookie(self, cookies):
+        """
+        driver添加cookie
+        :param cookies:
+        :return:
+        """
         for i in cookies[:-1]:
             name = re.search('(.*?)=', i).group(1)
             value = i.split(name)[1][1:]
@@ -40,24 +58,36 @@ class WordClick:
             }
             # 添加cookie
             self.driver.add_cookie(cookie_dist)
-        # 再次打开网页，获取带有验证码网页
-        self.driver.get(self.url)
-        time.sleep(2)
-        self.save_img()
 
-    def save_img(self):
+    def recognize(self):
+        """
+        获取图片，进行验证
+        :return:cookie
+        """
         # 刷新验证码
         self.driver.find_element_by_xpath("//*[@id='btnVRefresh']").click()
-        # 获取带文字的两张图片
-        self.get_cut_img('big_word_img.png', 'divVImage')
-        self.get_cut_img('small_word_img.png', 'divVPhrase')
+        # 获取带文字的图片
+        self.get_cut_img('full_word_img.png', 'yz-main')
+        # 大图
+        # self.get_cut_img('big_word_img.png', 'yz-pic-wrap')
+        # 小图
+        # self.get_cut_img('small_word_img.png', 'yz-pic-swrap')
+        # 获取文字坐标列表
+        all_position_list, pic_id = self.get_word_position()
+        # 点击文字
+        self.click_word(all_position_list)
+        # 点击验证
+        self.click_verify()
+        # 将新cookie传回爬虫
+        str_cookie = self.get_cookie()
+        return str_cookie
 
     def get_position(self, xpath):
         """
         获取验证码的位置
         :return: 验证码位置元祖
         """
-        img = self.wait.until(EC.presence_of_element_located((By.ID, xpath)))
+        img = self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, xpath)))
         time.sleep(2)
         location = img.location
         size = img.size
@@ -86,9 +116,78 @@ class WordClick:
         word_cut_img.save(name)
         return word_cut_img
 
+    def getfile(self, filepath):
+        """
+        读取文件
+        :param filepath: 文件路径名称
+        :return:bytes对象
+        """
+        with open(filepath, 'rb') as f:
+            return f.read()
+
+    def get_word_position(self):
+        """
+        获取文字的坐标
+        :return: 一个列表 里面包括多个文字坐标元组
+        """
+        img = self.getfile('full_word_img.png')
+        result = self.client.post_pic(img, 9004)
+        pic_id = result['pic_id']
+        if result['err_no'] == 0:
+            pic_str = result['pic_str']
+            position_str = pic_str.split('|')
+            all_position_list = [[int(number) for number in group.split(',')] for group in position_str]
+            print(all_position_list)
+            return all_position_list, pic_id
+        else:
+            self.client.report_error(pic_id)
+            return
+
+    def click_word(self, all_position_list):
+        """
+        按照坐标依次点击文字
+        :param all_position_list:
+        :return:
+        """
+        element = self.wait.until(EC.presence_of_element_located((By.XPATH, "//div[@class='yz-main']")))
+        for position in all_position_list:
+            ActionChains(self.driver).move_to_element_with_offset(element, position[0], position[1]).click().perform()
+            print('点击一个文字 坐标{}'.format({position[0], position[1]}))
+            time.sleep(2)
+
+    def click_verify(self):
+        """
+        点击验证按钮
+        :return:
+        """
+        self.driver.find_element_by_id('btnValidate').click()
+
+    def get_cookie(self):
+        """
+        获取cookie
+        :return:
+        """
+        cookie = self.driver.get_cookies()
+        time.sleep(5)
+        for i in cookie:
+            self.driver.add_cookie(i)
+        self.driver.get('https://ehire.51job.com/InboxResume/InboxRecentEngine.aspx?Style=1')
+        time.sleep(5)
+        cookies = self.driver.get_cookies()
+        str_cookie = ''
+        for j in cookies:
+            name = j['name']
+            value = j['value']
+            str_cookie = str_cookie + name + '=' + value + ';'
+        print(str_cookie)
+
+        # 关闭浏览器
+        self.driver.close()
+        return str_cookie
+
 
 if __name__ == '__main__':
-    cookie = 'EhireGuid=0ac534134836478fad24064c051c20a6;ASP.NET_SessionId=yvfcyhlxvljmrqqwb4i2hghj;LangType=Lang=&Flag=1;HRUSERINFO=CtmID=4371481&DBID=1&MType=02&HRUID=5809286&UserAUTHORITY=1111111111&IsCtmLevle=1&UserName=%e4%b8%8a%e6%b5%b7%e4%b8%b0%e8%8d%89%e6%96%87%e5%8c%96%e4%bc%a0%e6%92%ad%e6%9c%89%e9%99%90%e5%85%ac%e5%8f%b8&IsStandard=0&LoginTime=09%2f24%2f2019+16%3a41%3a53&ExpireTime=09%2f24%2f2019+16%3a51%3a53&CtmAuthen=0000011000000001000110010000000011100001&BIsAgreed=true&IsResetPwd=0&CtmLiscense=1&AccessKey=6623560edcf43de8&source=0;AccessKey=a2313acdcb7648d;KWD=EMP=;'
+    cookie = 'EhireGuid=e44d3d55f583447f9b34c3483a746dd9;ASP.NET_SessionId=s4zjschyufluioppc1vt1p5d;LangType=Lang=&Flag=1;HRUSERINFO=CtmID=4371481&DBID=1&MType=02&HRUID=5809286&UserAUTHORITY=1111111111&IsCtmLevle=1&UserName=%e4%b8%8a%e6%b5%b7%e4%b8%b0%e8%8d%89%e6%96%87%e5%8c%96%e4%bc%a0%e6%92%ad%e6%9c%89%e9%99%90%e5%85%ac%e5%8f%b8&IsStandard=0&LoginTime=09%2f25%2f2019+16%3a24%3a55&ExpireTime=09%2f25%2f2019+16%3a34%3a55&CtmAuthen=0000011000000001000110010000000011100001&BIsAgreed=true&IsResetPwd=0&CtmLiscense=1&AccessKey=67546573b544f13b&source=0;AccessKey=6b78b9c9331a434;KWD=EMP=;'
     w = WordClick(cookie)
     w.start()
 

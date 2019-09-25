@@ -9,6 +9,7 @@ import base64
 import random
 from PIL import Image
 from project.spider import Spider
+import sys
 
 
 class Verification:
@@ -67,9 +68,18 @@ class Verification:
                 self.move()
             except TimeoutException:
                 self.move()
-
-        # 获取cookie
-        self.get_cookie()
+        # 如有账号已登录 强制下线
+        try:
+            self.wait.until(EC.presence_of_element_located((By.XPATH, '//td[@align="center"]'))).click()
+            print('已有账号登录，强制下线')
+            # 获取cookie
+            self.get_cookie()
+            sys.exit()
+        except Exception:
+            print('没有账号登录，正常运行')
+            # 获取cookie
+            self.get_cookie()
+            sys.exit()
 
     def save_img(self, img_name, class_name):
         """
@@ -168,8 +178,8 @@ class Verification:
         # 关闭浏览器
         self.driver.close()
         # 将cookie传入爬虫代码
-        # s = Spider(str_cookie)
-        # s.start()
+        s = Spider(str_cookie)
+        s.start()
 
 
 if __name__ == '__main__':

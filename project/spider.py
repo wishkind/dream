@@ -43,7 +43,7 @@ class Spider:
             # todo 请求解析
             p = Parse(self.cookie)
             p.start('https://ehire.51job.com/Candidate/ResumeViewFolderV2.aspx', user_id)
-            time.sleep(5)
+            # time.sleep(5)
         self.count += 1
         self.small_six_page_params(VIEWSTART, 2, int(max_page))
 
@@ -101,10 +101,10 @@ class Spider:
             # 请求解析
             p = Parse(self.cookie)
             p.start('https://ehire.51job.com/Candidate/ResumeViewFolderV2.aspx', user_id)
-            time.sleep(5)
+            # time.sleep(5)
         log.info(VIEWSTART)
         # 延迟请求，防止被封IP
-        time.sleep(5)
+        # time.sleep(5)
         self.count += 1
         if self.count > max_page:
             sys.exit()

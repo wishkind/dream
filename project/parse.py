@@ -2,6 +2,8 @@ import requests
 from lxml import etree
 import re
 import pandas as pd
+import time
+from project.word_verification import WordClick
 from lib.log import LogHandler
 log = LogHandler(__name__)
 
@@ -17,6 +19,7 @@ class Parse:
             'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/76.0.3809.132 Safari/537.36',
             'Cookie': cookie
         }
+        self.cookie = cookie
 
     def start(self, url, user_id):
         params = {
@@ -24,18 +27,27 @@ class Parse:
             'hidFolder': 'EMP',
             'pageCode': 24
         }
-        r = requests.get(url=url, headers=self.headers, params=params)
-        if '请输入验证码' in r.text:
-            # todo 文字验证码
-            pass
+        try:
+            r = requests.get(url=url, headers=self.headers, params=params)
+        except Exception:
+            return
         tree = etree.HTML(r.text)
         # 姓名
         name = tree.xpath("//*[@id='tdseekname']")
         if len(name) > 0:
             name = tree.xpath("//*[@id='tdseekname']/text()")[0]
             name = ''.join(name.split())
-        else:
+        elif '此人为恶意投递，简历屏蔽中' in r.text:
+            print('此页失效')
             return
+        else:
+            print('有文字验证码')
+            # todo 验证后继续抓取  ???
+            # w = WordClick(self.cookie)
+            # new_cookie = w.start()
+            # s = Parse(new_cookie)
+            # s.start(url, user_id)
+
         # 应聘职位
         position_applied = tree.xpath("//*[@id='hidPositionName']/@value")[0]
         # 投递时间
