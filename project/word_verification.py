@@ -36,13 +36,12 @@ class WordClick:
         self.driver.get(self.url)
         time.sleep(2)
         # 进行识别
-        str_cookie = self.recognize()
-        return str_cookie
+        self.recognize()
 
     def input_cookie(self, cookies):
         """
         driver添加cookie
-        :param cookies:
+        :param:cookies
         :return:
         """
         for i in cookies[:-1]:
@@ -62,7 +61,7 @@ class WordClick:
     def recognize(self):
         """
         获取图片，进行验证
-        :return:cookie
+        :return:
         """
         # 刷新验证码
         self.driver.find_element_by_xpath("//*[@id='btnVRefresh']").click()
@@ -78,9 +77,9 @@ class WordClick:
         self.click_word(all_position_list)
         # 点击验证
         self.click_verify()
-        # 将新cookie传回爬虫
-        str_cookie = self.get_cookie()
-        return str_cookie
+        time.sleep(2)
+        # 关闭浏览器
+        self.driver.close()
 
     def get_position(self, xpath):
         """
@@ -138,6 +137,7 @@ class WordClick:
             position_str = pic_str.split('|')
             all_position_list = [[int(number) for number in group.split(',')] for group in position_str]
             print(all_position_list)
+            self.client.report_error(pic_id)    #　目前账户余额410题分，每次消耗４０题分，运行这里不消耗超级鹰的题分，最好注释掉，避免账号被封
             return all_position_list, pic_id
         else:
             self.client.report_error(pic_id)
@@ -179,15 +179,13 @@ class WordClick:
             name = j['name']
             value = j['value']
             str_cookie = str_cookie + name + '=' + value + ';'
-        print(str_cookie)
-
         # 关闭浏览器
         self.driver.close()
         return str_cookie
 
 
 if __name__ == '__main__':
-    cookie = 'EhireGuid=e44d3d55f583447f9b34c3483a746dd9;ASP.NET_SessionId=s4zjschyufluioppc1vt1p5d;LangType=Lang=&Flag=1;HRUSERINFO=CtmID=4371481&DBID=1&MType=02&HRUID=5809286&UserAUTHORITY=1111111111&IsCtmLevle=1&UserName=%e4%b8%8a%e6%b5%b7%e4%b8%b0%e8%8d%89%e6%96%87%e5%8c%96%e4%bc%a0%e6%92%ad%e6%9c%89%e9%99%90%e5%85%ac%e5%8f%b8&IsStandard=0&LoginTime=09%2f25%2f2019+16%3a24%3a55&ExpireTime=09%2f25%2f2019+16%3a34%3a55&CtmAuthen=0000011000000001000110010000000011100001&BIsAgreed=true&IsResetPwd=0&CtmLiscense=1&AccessKey=67546573b544f13b&source=0;AccessKey=6b78b9c9331a434;KWD=EMP=;'
+    cookie = 'EhireGuid=22ef6943816348e2927ee41b0d427269;HRUSERINFO=CtmID=4371481&DBID=1&MType=02&HRUID=5809286&UserAUTHORITY=1111111111&IsCtmLevle=1&UserName=%e4%b8%8a%e6%b5%b7%e4%b8%b0%e8%8d%89%e6%96%87%e5%8c%96%e4%bc%a0%e6%92%ad%e6%9c%89%e9%99%90%e5%85%ac%e5%8f%b8&IsStandard=0&LoginTime=09%2f26%2f2019+08%3a47%3a04&ExpireTime=09%2f26%2f2019+08%3a57%3a04&CtmAuthen=0000011000000001000110010000000011100001&BIsAgreed=true&IsResetPwd=0&CtmLiscense=1&AccessKey=2866dcf515f92b2a&source=0;ASP.NET_SessionId=txraf2lkq4hw0tldhkmevs5h;LangType=Lang=&Flag=1;AccessKey=f1995dba0f2b4b3;KWD=EMP=;'
     w = WordClick(cookie)
     w.start()
 

@@ -9,7 +9,6 @@ import base64
 import random
 from PIL import Image
 from project.spider import Spider
-import sys
 
 
 class Verification:
@@ -41,8 +40,16 @@ class Verification:
         self.move()
 
     def move(self):
-        # 刷新一下验证码
-        self.driver.find_element_by_xpath('//a[@class="geetest_refresh_1"]').click()
+        """
+        滑动验证码操作
+        :return:
+        """
+        time.sleep(2)
+        try:
+            # 刷新一下验证码
+            self.wait.until(EC.presence_of_element_located((By.XPATH, '//a[@class="geetest_refresh_1"]'))).click()
+        except TimeoutException:
+            self.move()
         time.sleep(1)
         # 保存有缺口的图片
         self.save_img('cut.png', 'geetest_canvas_bg')
@@ -54,32 +61,31 @@ class Verification:
         distance = self.get_distance(cut_img, full_img) - random.randint(6, 9)
         # 开始移动
         self.drag(distance)
-
         # 判断是否验证成功
         try:
             self.wait.until(EC.presence_of_element_located((By.XPATH, '//div[@class="geetest_slider geetest_success"]')))
             print('验证成功')
         except TimeoutException:
             print('再试一次')
-            time.sleep(5)
+            time.sleep(2)
             try:
                 self.wait.until(EC.presence_of_element_located((By.XPATH, '//div[@class="geetest_panel_error_content"]'))).click()
-                time.sleep(5)
                 self.move()
             except TimeoutException:
                 self.move()
         # 如有账号已登录 强制下线
         try:
+            time.sleep(2)
             self.wait.until(EC.presence_of_element_located((By.XPATH, '//td[@align="center"]'))).click()
             print('已有账号登录，强制下线')
-            # 获取cookie
-            self.get_cookie()
-            sys.exit()
         except Exception:
             print('没有账号登录，正常运行')
-            # 获取cookie
-            self.get_cookie()
-            sys.exit()
+        # 获取cookie
+        str_cookie = self.get_cookie()
+        print(str_cookie)
+        # 将cookie传入爬虫代码
+        s = Spider(str_cookie)
+        s.start()
 
     def save_img(self, img_name, class_name):
         """
@@ -160,26 +166,24 @@ class Verification:
     def get_cookie(self):
         """
         获取cookie
-        :return:
+        :return:cookie
         """
         cookie = self.driver.get_cookies()
-        time.sleep(5)
+        time.sleep(2)
         for i in cookie:
             self.driver.add_cookie(i)
         self.driver.get('https://ehire.51job.com/InboxResume/InboxRecentEngine.aspx?Style=1')
-        time.sleep(5)
+        time.sleep(2)
         cookies = self.driver.get_cookies()
         str_cookie = ''
         for j in cookies:
             name = j['name']
             value = j['value']
             str_cookie = str_cookie + name + '=' + value + ';'
-        print(str_cookie)
         # 关闭浏览器
         self.driver.close()
-        # 将cookie传入爬虫代码
-        s = Spider(str_cookie)
-        s.start()
+        # 返回cookie
+        return str_cookie
 
 
 if __name__ == '__main__':

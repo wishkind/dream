@@ -1,8 +1,8 @@
 import requests
 from lxml import etree
 import re
-import pandas as pd
 import time
+import pandas as pd
 from project.word_verification import WordClick
 from lib.log import LogHandler
 log = LogHandler(__name__)
@@ -22,32 +22,40 @@ class Parse:
         self.cookie = cookie
 
     def start(self, url, user_id):
+        global experience, gender, age, date_of_birth, residence, one_level_info
         params = {
             'hidSeqID': user_id,
             'hidFolder': 'EMP',
             'pageCode': 24
         }
         try:
-            r = requests.get(url=url, headers=self.headers, params=params)
-        except Exception:
+            r = requests.get(url=url, headers=self.headers, params=params, timeout=10)
+        except Exception as e:
+            print(e)
             return
         tree = etree.HTML(r.text)
         # 姓名
         name = tree.xpath("//*[@id='tdseekname']")
         if len(name) > 0:
-            name = tree.xpath("//*[@id='tdseekname']/text()")[0]
-            name = ''.join(name.split())
+            pass
         elif '此人为恶意投递，简历屏蔽中' in r.text:
             print('此页失效')
             return
         else:
             print('有文字验证码')
-            # todo 验证后继续抓取  ???
-            # w = WordClick(self.cookie)
-            # new_cookie = w.start()
-            # s = Parse(new_cookie)
-            # s.start(url, user_id)
-
+            # 验证后继续抓取
+            w = WordClick(self.cookie)
+            w.start()
+            time.sleep(1)
+            # 重新请求
+            try:
+                r = requests.get(url=url, headers=self.headers, params=params, timeout=10)
+            except Exception as e:
+                print(e)
+                return
+        tree = etree.HTML(r.text)
+        name = tree.xpath("//*[@id='tdseekname']/text()")[0]
+        name = ''.join(name.split())
         # 应聘职位
         position_applied = tree.xpath("//*[@id='hidPositionName']/@value")[0]
         # 投递时间
@@ -73,17 +81,32 @@ class Parse:
             gender_info = tree.xpath("//table[@class='infr']/tr[3]/td[1]")[0]
             gender_info = gender_info.xpath('string(.)')
             gender_info = ''.join(gender_info.split())
-            # 性别
-            gender = gender_info.split('|')[0]
-            # 年龄
-            age_info = gender_info.split('|')[1]
-            age = re.search('(\d+岁)', age_info, re.S | re.M).group(1)
-            # 出生年月
-            date_of_birth = re.search('(\d+年\d+月\d+日)', age_info, re.S | re.M).group(1)
-            # 现居住地
-            residence = gender_info.split('|')[2]
-            # 工作经验
-            experience = gender_info.split('|')[3]
+            if len(gender_info.split('|')) == 4:
+                # 性别
+                gender = gender_info.split('|')[0]
+                # 年龄
+                age_info = gender_info.split('|')[1]
+                age = re.search('(\d+岁)', age_info, re.S | re.M).group(1)
+                # 出生年月
+                date_of_birth = re.search('(\d+年\d+月\d+日)', age_info, re.S | re.M).group(1)
+                # 现居住地
+                residence = gender_info.split('|')[2]
+                # 工作经验
+                experience = gender_info.split('|')[3]
+            elif len(gender_info.split('|')) == 3:
+                # 性别
+                gender = gender_info.split('|')[0]
+                # 年龄
+                age_info = gender_info.split('|')[1]
+                age = re.search('(\d+岁)', age_info, re.S | re.M).group(1)
+                # 出生年月
+                date_of_birth = re.search('(\d+年\d+月\d+日)', age_info, re.S | re.M).group(1)
+                # 现居住地
+                residence = ''
+                # 工作经验
+                experience = gender_info.split('|')[2]
+            else:
+                print('其他格式, 请检查')
         else:
             gender = ''
             age = ''
@@ -148,6 +171,7 @@ class Parse:
             degree_info = ''
 
         data = {
+            'ID': user_id,
             '姓名': name,
             '应聘职位': position_applied,
             '投递时间': time_applied,
@@ -181,19 +205,22 @@ class Parse:
             if len(one_level_info_name) > 0:
                 one_level_info_name = info.xpath(".//tr[1]/td[@class='plate1']/text()")[0]
                 one_level_info_name = ''.join(one_level_info_name.split())
-                one_level_info = info.xpath(".//tr[1]/td[@class='plate1']/span[1]")
-                if len(one_level_info) > 0:
-                    one_level_info = info.xpath(".//tr[1]/td[@class='plate1']/span[1]/text()")
+
+                if one_level_info_name == '目前年收入：' or '技能特长':
+                    one_level_info = info.xpath(".//tr[1]/td[@class='plate1']/span[1]")
                     if len(one_level_info) > 0:
-                        one_level_info = info.xpath(".//tr[1]/td[@class='plate1']/span[1]/text()")[0]
-                        one_level_info = ''.join(one_level_info.split())
+                        one_level_info = info.xpath(".//tr[1]/td[@class='plate1']/span[1]/text()")
+                        if len(one_level_info) > 0:
+                            one_level_info = info.xpath(".//tr[1]/td[@class='plate1']/span[1]/text()")[0]
+                            one_level_info = ''.join(one_level_info.split())
+                        else:
+                            one_level_info = ''
                     else:
                         one_level_info = ''
                 else:
                     one_level_info = ''
-                one_level_info_name_dict = {
-                    one_level_info_name: one_level_info
-                }
+                info_list = []
+                info_list.append([one_level_info_name, one_level_info])
                 # 二级分类
                 # 个人信息
                 two_level_info_a = info.xpath("./tbody/tr[2]/td[1]/table[1]/tbody/tr/td/table[1]/tbody[1]/tr")
@@ -207,25 +234,27 @@ class Parse:
                 two_level_info_e = info.xpath("./tr[2]/td[1]/table[1]/tbody/tr/td/table/tr")
 
                 if len(two_level_info_a) > 0:
-                    one_level_info_name_dict = self.get_more_info(two_level_info_a, one_level_info_name_dict)
+                    info_list = self.get_more_info(two_level_info_a, info_list)
                 elif len(two_level_info_b) > 0:
-                    one_level_info_name_dict = self.get_more_info(two_level_info_b, one_level_info_name_dict)
+                    info_list = self.get_more_info(two_level_info_b, info_list)
                 elif len(two_level_info_c) > 0:
-                    one_level_info_name_dict = self.get_more_info(two_level_info_c, one_level_info_name_dict)
+                    info_list = self.get_more_info(two_level_info_c, info_list)
                 elif len(two_level_info_d) > 0:
-                    one_level_info_name_dict = self.get_more_info(two_level_info_d, one_level_info_name_dict)
+                    info_list = self.get_more_info(two_level_info_d, info_list)
                 elif len(two_level_info_e) > 0:
-                    one_level_info_name_dict = self.get_more_info(two_level_info_e, one_level_info_name_dict)
-
+                    info_list = self.get_more_info(two_level_info_e, info_list)
                 data.update({
-                    one_level_info_name: one_level_info_name_dict
+                    one_level_info_name: info_list
                 })
-        # df = pd.DataFrame(data=[data])
-        # df.to_csv("./test.csv", encoding='utf-8-sig', header=False, index=False)
-        log.info(data)
+
+        # 存储数据
+        df = pd.DataFrame.from_dict(data, orient='index', columns=['value'])
+        df.transpose()
+        df.to_csv('data.csv', mode='a')
+        print(df)
 
     @staticmethod
-    def get_more_info(two_level_info, one_level_info_name_dict):
+    def get_more_info(two_level_info, info_list):
         for i in two_level_info:
             two_level_info_name = i.xpath('./td[1]')
             if len(two_level_info_name) > 0:
@@ -239,10 +268,8 @@ class Parse:
                 two_level_info_status = ''.join(two_level_info_status.split())
             else:
                 two_level_info_status = ''
-            one_level_info_name_dict.update({
-                two_level_info_name: two_level_info_status
-            })
-        return one_level_info_name_dict
+            info_list.append([two_level_info_name, two_level_info_status])
+        return info_list
 
 
 if __name__ == '__main__':
@@ -251,3 +278,11 @@ if __name__ == '__main__':
 
 
 
+"""
+'ID', '姓名', '应聘岗位', '投递时间', '应聘公司',
+'匹配度', '工作状态', '电话', '邮箱', '性别', '年龄',
+'出生年月', '现居住地', '工作经验', '最近工作',
+'最高学历/学位', '个人信息', '目前年收入：',
+'求职意向', '项目经验', '教育经历', '在校情况',
+'技能特长', '操作动态', '附加信息'
+"""

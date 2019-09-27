@@ -1,6 +1,5 @@
 import requests
 from lxml import etree
-import time
 import sys
 from lib.log import LogHandler
 from project.parse import Parse
@@ -37,13 +36,11 @@ class Spider:
         user_links = tree.xpath("//input[@id='chkBox']")
         for link in user_links:
             user_id = link.xpath('@value1')[0]
-            # todo 更加ID 去重
             url = 'https://ehire.51job.com/Candidate/ResumeViewFolderV2.aspx?hidSeqID=' + user_id + '&hidFolder=EMP&pageCode=24'
             log.info(url)
-            # todo 请求解析
             p = Parse(self.cookie)
             p.start('https://ehire.51job.com/Candidate/ResumeViewFolderV2.aspx', user_id)
-            # time.sleep(5)
+
         self.count += 1
         self.small_six_page_params(VIEWSTART, 2, int(max_page))
 
@@ -87,7 +84,11 @@ class Spider:
         :param max_page: 最大页码
         :return:
         """
-        r = requests.post(url=self.start_url, headers=self.headers, data=data)
+        try:
+            r = requests.post(url=self.start_url, headers=self.headers, data=data, timeout=10)
+        except Exception as e:
+            print(e)
+            return
         tree = etree.HTML(r.text)
         # 获取下一页的关键参数VIEWSTART
         VIEWSTART = tree.xpath("//input[@id='__VIEWSTATE']")[0].xpath("@value")[0]
@@ -95,18 +96,14 @@ class Spider:
         user_links = tree.xpath("//input[@id='chkBox']")
         for link in user_links:
             user_id = link.xpath('@value1')[0]
-            # todo 根据id 去重
             url = 'https://ehire.51job.com/Candidate/ResumeViewFolderV2.aspx?hidSeqID=' + user_id + '&hidFolder=EMP&pageCode=24'
             log.info(url)
             # 请求解析
             p = Parse(self.cookie)
             p.start('https://ehire.51job.com/Candidate/ResumeViewFolderV2.aspx', user_id)
-            # time.sleep(5)
-        log.info(VIEWSTART)
-        # 延迟请求，防止被封IP
-        # time.sleep(5)
+        print(VIEWSTART)
         self.count += 1
-        if self.count > max_page:
+        if self.count > max_page + 1:
             sys.exit()
         else:
             if page >= 5:
